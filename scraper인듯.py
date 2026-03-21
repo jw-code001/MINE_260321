@@ -73,7 +73,7 @@ def scrape_menu_cafe24(            # :str :int = type hint
     chrome_options.add_argument("--no-sandbox")
     # 서버가 보안용 sandbox거부 많이함 --> 아예 안씀
     chrome_options.add_argument("--disable-dev-shm-usage")
-    # 공유 메모리( /dev/shm, 보통 64MB)가 아닌, SSD의 가상메모리 사용지시
+    # 공유 메모리( /dev/shm, 보통 64MB = 램부족시 스톱됨)가 아닌, SSD의 가상메모리 사용지시
 
     driver = webdriver.Chrome(options=chrome_options)
     results = []
@@ -91,25 +91,90 @@ def scrape_menu_cafe24(            # :str :int = type hint
 
     try:
         print(f"🌐 접속: {url}")
-        driver.get(url)
+        driver.get(url) 
+        # .get의 의미
+        # 셀레니움 : driver.get(url)    브라우저를 해당 주소로 이동시켜라 (지금)
+        # 딕셔너리 : params.get('key')	데이터 뭉치에서 특정 값을 꺼내와라
+        # Requests 라이브러리 : requests.get(url)	화면은 안 띄우고 HTML 코드만 슥 긁어와라
 
         print(f"⏳ 로딩 대기: {wait_time}초")
         time.sleep(wait_time)
+        # .get으로 html은 다 가져왔어도, 아직 자바스크립트가 덜 오거나, 덜 로딩되어 기다림
+
+
+
+# --- [다음 단계 예고 메모] ---
+        # 1. parent_selector로 메뉴 전체를 담고 있는 '큰 울타리' 요소 찾기 ---> # 메뉴바 #
+        # 2. 그 안에서 item_selector로 '개별 메뉴'들 다 긁어오기 (find_elements)
+        # 3. for 반복문 돌리면서 각 메뉴의 글자(text)와 링크(href) 추출하기
+        # 4. 링크 안에서 cate_no 번호만 쏙 뽑아내기 (parse_qs 사용)
+
 
         parent = driver.find_element(By.CSS_SELECTOR, parent_selector)
-
+        # parent_selector를 사람이 F12등으로 찾아서 실행모듈에서 지정해 주면, 
+        # driver가 css_selector로 찾아서 parent 변수에 넣음
+        
         # print("--- 부모 요소 HTML ---")
         # print(parent.get_attribute('outerHTML'))
+      
+        # --> 디버깅 코드
+        # parent라고 이름 붙인 그 구역의 **"HTML 소스코드 전체"**를 문자열로 가져오라.
+        # 출력된 내용이 내가 원한 것이 아니면 ? → parent_selector 주소를 다시 따야함을 알게됨.
+
+        # 주석을 풀면 이렇게 출력됩니다.
+        # <div id="category" class="menu_wrap">
+        #    <ul>
+        #        <li><a href="...">상의</a></li>   <--- 이거임 
+        #        <li><a href="...">하의</a></li>   <--- 이거임
+        #    </ul>
+        # </div>
+
         items = parent.find_elements(By.TAG_NAME, item_selector)
-        # print(items)
+        # 실행 모듈에서 item_selector 지정해주면, TAG_NAME 기준으로 driver가 찾아옴.
+        ### driver가 아니라 parent임
+        # --> 이미 parent가 된 메뉴바등에서만 찾으라는 의미.
+        # parent: <nav> ... </nav> (커다란 상자 1개)
+
+        ### element가 아니라 elements임.
+        # --> 메뉴바는 1개지만, 내용은 여러개라서 결과는 리스트가 됨.
+        # items: [ <li>1</li>, <li>2</li>, <li>3</li> ]
+
+        # print(items) --> 디버깅 코드
 
         print(f"🔍 네비 요소 개수: {len(items)}")
+        # --> 결과로 몇개를 찾았는지를 알려줌. 0이면 ? --> 다시 !!
 
         for item in items:
-            # Swiper duplicate 필터링
+            # Swiper duplicate 필터링 : (양말(복제)-상의-하의-양말-상의(복제))
             class_name = item.get_attribute("class")
             if "d-none" in class_name:
                 continue
+
+            ## class 속성값 가져와서 중복된게 있으면 아래코드 실행없이 for-in문으로 복귀 
+
+            # d-none이나 swiper-slide-duplicate 같은 클래스가 붙어 숨겨져 있습니다
+            # 중복 방지위해서 걸러냄
+            # 크롤링하려면 F12로 "이 사이트는 숨겨진 애들한테 어떤 이름표를 붙여줬지?"를 먼저 확인
+
+            # .get_attribute("속성명")
+            # 1. 출처: 셀레니움이 제공하는 웹 요소의 속성정보 추출 기능.
+            # 2. 기능: 태그 안에 숨겨진 속성(class, id, href, title 등)의 실제 값을 읽어옴.
+            # 3. 목적: 이 메뉴가 숨겨진 메뉴인지(d-none), 
+            #         링크 주소는 무엇인지(href) 등을 판단하는 근거로 사용함.
+
+
+            # id : 고유한 이름표, 한 페이지에 한번만 사용, 메뉴바(parent) 같은 큰 구역을 찾을 때 최고!
+            #      CSS 기호: # (예: #category, #login-btn)
+            # class: 그룹/상태이름, d-none 같은 **필터링(가짜 거르기)**에 필수!
+            #      CSS 기호: . (예: .menu_item, .d-none)
+            # href : 이동할 주소, 카테고리의 실제 상세 URL을 수집할 때 필수!
+            #      주로 <a> (Anchor) 태그에서 사용
+            # title : 보조 설명, 메뉴 이름이 이미지일 때 글자 정보를 대신 캘 때 사용.
+            #      작은 풍선 도움말
+
+
+
+
 
             try:
                 a_element = item.find_element(By.TAG_NAME, a_tag)
