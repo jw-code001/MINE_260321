@@ -1,3 +1,9 @@
+# 메뉴, 베너 스크래퍼가 각각의 함수로 분리되어 있음
+# 분리 이유 : 데이터 구조의 차이
+  # 메뉴 수집기: 결과가 [메뉴명, 카테고리번호] 이렇게 2개씩 묶여 나옵니다.
+  # 배너 수집기: 결과가 [제목, 내용, 카테고리번호] 이렇게 3개씩 묶여 나옵니다.
+  # 나중에 엑셀에 저장할 때 2개, 3개 혼란 방지 
+
 
 import datetime # 달력느낌 now=datetime.datetime.now()
 import time # 시간제어, time.sleep(10) # 10초 동안 프로그램을 멈추기
@@ -42,7 +48,7 @@ def scrape_menu_cafe24(            # :str :int = type hint
     url: str,                      
     parent_selector: str,          
     item_selector: str,
-    a_tag = "a",                   # 셀레니움에서 <a>는 <<a>>로 인식됨
+    a_tag = "a",                   # 셀레니움에서 <>는 빼는게 기본
     content_tag = "span, strong",
     
     wait_time: int = 10,
@@ -145,6 +151,7 @@ def scrape_menu_cafe24(            # :str :int = type hint
 
         ### element가 아니라 elements임.
         # --> 메뉴바는 1개지만, 내용은 여러개라서 결과는 리스트가 됨.
+        # 하나도 못찾으면 error발생이 아닌 빈리스트[]를 반환 
         # items: [ <li>1</li>, <li>2</li>, <li>3</li> ]
 
         # print(items) --> 디버깅 코드
@@ -157,6 +164,12 @@ def scrape_menu_cafe24(            # :str :int = type hint
             class_name = item.get_attribute("class")
             if "d-none" in class_name:
                 continue
+
+            # item.get_attribute("class")를 했을 때, 
+            # 해당 요소에 클래스가 아예 없으면 None을 반환할 수 있습니다.
+
+            # 안전한 코드: class_name = item.get_attribute("class") or "" 
+            # (클래스가 없으면 빈 글자로 취급)
 
             ## class 속성값 가져와서 중복된게 있으면 아래코드 실행없이 for-in문으로 복귀 
 
@@ -294,6 +307,13 @@ def scrape_banners_swiper_cafe24(
                 content = item.find_element(By.TAG_NAME, content_tag).get_attribute("innerText").strip()
                 if item.tag_name == 'a' :
                     href = item.get_attribute("href").strip()
+
+                    # item_selector로 잡힌 태그가 반드시 <a>일 때만 링크를 가져오게 되어 있습니다. 
+                    # 만약 배너 구조가 <li><a href="...">...</a></li> 처럼 <li>가 아이템이고 
+                    # 그 안에 <a>가 들어있는 구조라면, 
+                    # 메뉴 스크래퍼처럼 item.find_element(By.TAG_NAME, "a") 과정을 한번 거치는 것이 더 안전.
+
+
                     if href :
                         # 1. URL 분석 (Parse)
                         parsed_url = urlparse(href)
