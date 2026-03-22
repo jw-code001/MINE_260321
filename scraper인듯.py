@@ -42,7 +42,7 @@ def scrape_menu_cafe24(            # :str :int = type hint
     url: str,                      
     parent_selector: str,          
     item_selector: str,
-    a_tag = "a",
+    a_tag = "a",                   # 셀레니움에서 <a>는 <<a>>로 인식됨
     content_tag = "span, strong",
     
     wait_time: int = 10,
@@ -110,6 +110,14 @@ def scrape_menu_cafe24(            # :str :int = type hint
         # 4. 링크 안에서 cate_no 번호만 쏙 뽑아내기 (parse_qs 사용)
 
 
+    # 목표 : 메뉴 이름, 링크, 카테고리 번호 모으기! 
+    
+    # 메뉴 덩어리를 잡고 (item)
+    # 이름을 캐고 (navitxt)
+    # 링크를 따고 (navihref)
+    # 그 링크에서 (cate_no) 취득
+
+
         parent = driver.find_element(By.CSS_SELECTOR, parent_selector)
         # parent_selector를 사람이 F12등으로 찾아서 실행모듈에서 지정해 주면, 
         # driver가 css_selector로 찾아서 parent 변수에 넣음
@@ -173,17 +181,24 @@ def scrape_menu_cafe24(            # :str :int = type hint
             #      작은 풍선 도움말
 
 
-
-
-
             try:
                 a_element = item.find_element(By.TAG_NAME, a_tag)
-                navitxt = a_element.get_attribute("innerText").strip()
-                navihref = a_element.get_attribute("href").strip()
-              
+                # a_tag : 변수, 위의 함수에 'a'로 지정되어 있음
+                navitxt = a_element.get_attribute("innerText").strip() # --> 메뉴이름
+                # innerText : 꾸며진 text도 잘 가져옴
+                # .strip() : 공백제거 -> text만 남김
+                navihref = a_element.get_attribute("href").strip() # --> 메뉴주소
+
+                # --> 버튼(a)찾고, 메뉴이름 찾고, 누르면 가는 주소까지 찾아뒀음
+
                 if  navihref :
                     parsed_url = urlparse(navihref) # navihref로 변수명 통일
+                    # urlparse(navihref): 긴 URL을 도메인, 경로, 쿼리(파라미터) 등으로 조각조각 나눕니다.
+
                     params = parse_qs(parsed_url.query)
+                    # parse_qs(parsed_url.query)
+                    # : 주소창의 ? 뒤에 붙는 정보들(예: cate_no=24&sort=1)을 사전형태로 변환.
+                    # 결과물 예시: {'cate_no': ['24'], 'sort': ['1']}
         
                     # 3. cate_no 추출 (없으면 기본값 "#none" 사용)
                     # params.get('키', 기본값) 구조를 활용합니다.
@@ -191,6 +206,16 @@ def scrape_menu_cafe24(            # :str :int = type hint
                     # cate_no_list = params.get('cate_no')
                     # if cate_no_list:
                     #     cate_no = cate_no_list[0]
+                    # 삼항연산자 : 위의 3줄을 한줄로
+
+                    # params.get('cate_no') → 결과: ['24'] (리스트)
+                    # params.get('cate_no')[0] → 결과: '24'(리스트의 0번 인덱스, 즉 첫 번째만)
+
+    # 메뉴 이름은 "상의", "TOP"처럼 운영자가 바꿀 수 있지만, 
+    # **cate_no**는 DB에서 변하지 않는 고유 식별자
+
+    # 이제 메뉴 이름, 링크, 카테고리 번호까지 다 모았네요! 
+
 
                 if cate_no == "#none":
                     continue
@@ -200,8 +225,9 @@ def scrape_menu_cafe24(            # :str :int = type hint
                     results.append([ navitxt, cate_no])
 
             except Exception:
-                continue
-
+                continue # ''멈추지말고'' 다음으로 컨티뉴 
+            # ===> 어떤 에러가 나더라도 멈추지말고 다음으로 진행
+            
     finally:
         driver.quit()
 
